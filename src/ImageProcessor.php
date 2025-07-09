@@ -26,44 +26,63 @@ final class ImageProcessor
         putenv('MAGICK_TEMPORARY_PATH=' . $this->tempDir);
     }
 
-    /** 
-     * @param array{force?:bool,outputDir?:string,outputExt?:string,operations?:array} $options 
+    /**
+     * @param array{force?:bool,outputDir?:string,outputExt?:string,operations?:array,fallback?:string|null} $options
      */
     public function process(string $imagePath, array $options = []): ImageInfo
     {
-        $outputDir  = rtrim($options['outputDir'] ?? dirname($imagePath), DIRECTORY_SEPARATOR);
-        $outputExt  = strtolower($options['outputExt'] ?? self::DEFAULT_IMAGE_FORMAT);
-        $force      = (bool) ($options['force'] ?? false);
-        $ops        = $options['operations'] ?? [];
+        $outputExt = strtolower($options['outputExt'] ?? self::DEFAULT_IMAGE_FORMAT);
+        $outputDir = rtrim($options['outputDir'] ?? dirname($imagePath), DIRECTORY_SEPARATOR);
+        $force     = (bool) ($options['force'] ?? false);
+        $ops       = $options['operations'] ?? [];
+
+        // -------- 0. Fallback and blank logic --------
+        if (!is_file($imagePath) || !is_readable($imagePath)) {
+            $fallback = $options['fallback'] ?? null;
+            if ($fallback && is_file($fallback) && is_readable($fallback)) {
+                $imagePath = $fallback;
+            } else {
+                $blankPath = $outputDir . DIRECTORY_SEPARATOR . 'blank.' . $outputExt;
+                if (!is_file($blankPath) || !is_readable($blankPath)) {
+                    $im = new Imagick();
+                    $im->newImage(100, 100, new ImagickPixel('white'));
+                    $im->setImageFormat($outputExt);
+                    $im->writeImage($blankPath);
+                    $im->clear();
+                }
+                $imagePath = $blankPath;
+            }
+        }
 
         if (!is_dir($outputDir) && !@mkdir($outputDir, 0777, true) && !is_dir($outputDir)) {
             throw new RuntimeException('Cannot create output dir: ' . $outputDir);
         }
 
-        /* ---------- 1. build a signature ---------- */
+        // ---------- 1. build a signature ----------
+        $srcMTime = @filemtime($imagePath) ?: 0;
         $signatureData = [
-            'srcMTime'   => filemtime($imagePath),
-            'ops'        => self::normaliseOpsForHash($ops),
-            'format'     => $outputExt,
-            'quality'    => self::DEFAULT_COMPRESSION_QUALITY,
+            'srcMTime' => $srcMTime,
+            'ops'      => self::normaliseOpsForHash($ops),
+            'format'   => $outputExt,
+            'quality'  => self::DEFAULT_COMPRESSION_QUALITY,
         ];
-        $sig  = substr(hash('sha256', json_encode($signatureData)), 0, 12);
+        $sig = substr(hash('sha256', json_encode($signatureData)), 0, 12);
 
-        $basename  = pathinfo($imagePath, PATHINFO_FILENAME) . "-{$sig}.{$outputExt}";
+        $basename = pathinfo($imagePath, PATHINFO_FILENAME) . "-{$sig}.{$outputExt}";
         $cachePath = $outputDir . DIRECTORY_SEPARATOR . $basename;
 
-        /* ---------- 2. fast-exit if perfect match exists ---------- */
+        // ---------- 2. fast-exit if perfect match exists ----------
         if (!$force && is_file($cachePath)) {
-            [$w, $h] = getimagesize($cachePath) ?: [0, 0];
+            [$w, $h] = @getimagesize($cachePath) ?: [0, 0];
             return new ImageInfo($cachePath, $w, $h);
         }
 
-        /* ---------- 3. create / overwrite ---------- */
+        // ---------- 3. create / overwrite ----------
         $im = new Imagick($imagePath);
         $im->setImageCompressionQuality(self::DEFAULT_COMPRESSION_QUALITY);
 
         foreach ((array) $ops as $op) {
-            if (($op instanceof Op) === false) {
+            if (!($op instanceof Op)) {
                 throw new RuntimeException('Operation not callable');
             }
             try {
