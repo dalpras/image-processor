@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 // src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use RuntimeException;
 
-class OpFilter {
-
-    public static function filter(string $type, int|float ...$args): Op
+class ImageFilter 
+{
+    public static function filter(string $type, int|float ...$args): ImageHandle
     {
         $fn = static function (Imagick $img) use ($type, $args): void {
 
@@ -93,8 +93,6 @@ class OpFilter {
                     throw new RuntimeException("Unsupported filter: {$type}");
             }
         };
-
-        return new Op("filter:{$type}", $fn);
+        return new ImageHandle("filter:{$type}", $fn);
     }
-
 }

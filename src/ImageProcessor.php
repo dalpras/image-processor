@@ -82,7 +82,7 @@ final class ImageProcessor
         $im->setImageCompressionQuality(self::DEFAULT_COMPRESSION_QUALITY);
 
         foreach ((array) $ops as $op) {
-            if (!($op instanceof Op)) {
+            if (!($op instanceof ImageHandle)) {
                 throw new RuntimeException('Operation not callable');
             }
             try {
@@ -109,7 +109,7 @@ final class ImageProcessor
     private static function normaliseOpsForHash(array $ops): string
     {
         return json_encode(array_map(
-            fn($op) => $op instanceof Op ? $op->key()
+            fn($op) => $op instanceof ImageHandle ? $op->key()
                       : (is_string($op) ? $op
                       : (is_array($op)  ? implode('::', $op)
                       : 'unknown')),

@@ -3,16 +3,16 @@
 declare(strict_types=1);
 
 // src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use ImagickDraw;
 use ImagickException;
 use ImagickPixel;
 
-class OpOverlay {
-
+class ImageOverlay 
+{
     /**
      * Write a string onto the image at absolute pixel coordinates.
      *
@@ -36,7 +36,7 @@ class OpOverlay {
         ?float  $opacity = null,
         int     $angle  = 0,
         int     $align  = Imagick::ALIGN_LEFT
-    ): Op {
+    ): ImageHandle {
         $fn = static function (Imagick $img) use (
             $text, $x, $y, $font, $size, $color, $opacity, $angle, $align
         ): void {
@@ -83,7 +83,7 @@ class OpOverlay {
             unset($draw);
         };
 
-        return new Op(
+        return new ImageHandle(
             sprintf(
                 'overlay:%s-%dx%dx%s:%s:%s:%s:%d',
                 rawurlencode($text), $x, $y, $size, $color,

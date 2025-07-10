@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DalPraS\Tests\Image;
 
 use DalPraS\Image\ImageProcessor;
-use DalPraS\Image\Ops\OpFilter;
+use DalPraS\Image\Handlers\ImageFilter;
 use Imagick;
 use ImagickPixel;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +36,7 @@ class FilterTest extends TestCase
         $svc = new ImageProcessor();
         $out = $svc->process($this->dir . '/src.png', [
             'outputDir'  => $this->dir,
-            'operations' => [OpFilter::filter('grayscale')],
+            'operations' => [ImageFilter::filter('grayscale')],
         ]);
         $im = new Imagick($out->getPathname());
         $color = $im->getImagePixelColor(10, 10)->getColor();

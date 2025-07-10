@@ -6,7 +6,7 @@ namespace DalPraS\Image;
 
 use Imagick;
 
-final class Op
+final class ImageHandle
 {
     public function __construct(
         private string   $key,     // e.g. 'resize:300x200'

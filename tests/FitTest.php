@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DalPraS\Tests\Image;
 
 use DalPraS\Image\ImageProcessor;
-use DalPraS\Image\Ops\OpFit;
+use DalPraS\Image\Handlers\ImageFit;
 use Imagick;
 use ImagickPixel;
 use PHPUnit\Framework\TestCase;
@@ -60,7 +60,7 @@ class FitTest extends TestCase
         /* --- act -------------------------------------------------------------- */
         $result = $svc->process($src, [
             'outputDir'  => $tmp,
-            'operations' => [OpFit::margin(2, 2, 2, 2)],
+            'operations' => [ImageFit::margin(2, 2, 2, 2)],
         ]);
 
         /* --- assert ----------------------------------------------------------- */

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DalPraS\Tests\Image;
 
 use DalPraS\Image\ImageProcessor;
-use DalPraS\Image\Ops\OpCrop;
+use DalPraS\Image\Handlers\ImageCrop;
 use Imagick;
 use ImagickPixel;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +36,7 @@ class CropTest extends TestCase
         $svc = new ImageProcessor();
         $result = $svc->process($this->dir . '/src.png', [
             'outputDir' => $this->dir,
-            'operations' => [OpCrop::crop(5, 5, 0, 0)],
+            'operations' => [ImageCrop::crop(5, 5, 0, 0)],
         ]);
         $this->assertSame([5, 5], [$result->getWidth(), $result->getHeight()]);
     }

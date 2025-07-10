@@ -3,20 +3,21 @@
 declare(strict_types=1);
 
 // src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use RuntimeException;
 
-class OpResize {
-    
-    public static function resize(int $w, int $h, bool $keep = true): Op {
+class ImageResize 
+{
+    public static function resize(int $w, int $h, bool $keep = true): ImageHandle
+    {
         $fn = fn(Imagick $i) => $keep
             ? $i->thumbnailImage($w, $h, true)
             : $i->resizeImage($w, $h, \Imagick::FILTER_LANCZOS, 1);
 
-        return new Op("resize:{$w}x{$h}:{$keep}", $fn);
+        return new ImageHandle("resize:{$w}x{$h}:{$keep}", $fn);
     }
 
     /**
@@ -27,7 +28,7 @@ class OpResize {
      *
      * @return Op  Callable wrapper for ImageProcessor::process()
      */
-    public static function resizeByRatio(int $dim, bool $isWidth = true): Op
+    public static function resizeByRatio(int $dim, bool $isWidth = true): ImageHandle
     {
         $fn = static function (Imagick $img) use ($dim, $isWidth): void {
             if ($dim <= 0) {
@@ -69,20 +70,20 @@ class OpResize {
             }
         };
 
-        return new Op("resize-by-ratio:{$dim}-{$isWidth}", $fn);
+        return new ImageHandle("resize-by-ratio:{$dim}-{$isWidth}", $fn);
     }
 
-    public static function stretch(int $newW, int $newH): Op
+    public static function stretch(int $newW, int $newH): ImageHandle
     {
         $fn = fn(Imagick $i) => $i->scaleImage($newW, $newH, false);
-        return new Op("stretch:{$newW}-{$newH}", $fn);
+        return new ImageHandle("stretch:{$newW}-{$newH}", $fn);
     }
 
-    public static function stretchByPercent(float $wp, float $hp): Op
+    public static function stretchByPercent(float $wp, float $hp): ImageHandle
     {
         $fn = function (Imagick $i) use ($wp, $hp) {
             $i->scaleImage((int)($i->getImageWidth() * $wp / 100), (int)($i->getImageHeight() * $hp / 100), false);
         };
-        return new Op("resize-by-percent:{$wp}-{$hp}", $fn);
+        return new ImageHandle("resize-by-percent:{$wp}-{$hp}", $fn);
     }
 }

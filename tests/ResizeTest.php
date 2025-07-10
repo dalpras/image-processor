@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DalPraS\Tests\Image;
 
 use DalPraS\Image\ImageProcessor;
-use DalPraS\Image\Ops\OpResize;
+use DalPraS\Image\Handlers\ImageResize;
 use Imagick;
 use ImagickPixel;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +37,7 @@ class ResizeTest extends TestCase
         $result = $svc->process($this->dir . '/src.png', [
             'outputDir' => $this->dir,
             'suffix' => 'small',
-            'operations' => [OpResize::resize(5, 5)],
+            'operations' => [ImageResize::resize(5, 5)],
         ]);
         $this->assertSame([5, 5], [$result->getWidth(), $result->getHeight()]);
     }
@@ -47,7 +47,7 @@ class ResizeTest extends TestCase
         $svc = new ImageProcessor();
         $result = $svc->process($this->dir . '/src.png', [
             'outputDir' => $this->dir,
-            'operations' => [OpResize::resizeByRatio(10, true)],
+            'operations' => [ImageResize::resizeByRatio(10, true)],
         ]);
         $this->assertSame(10, $result->getWidth());
     }
@@ -57,7 +57,7 @@ class ResizeTest extends TestCase
         $svc = new ImageProcessor();
         $result = $svc->process($this->dir . '/src.png', [
             'outputDir' => $this->dir,
-            'operations' => [OpResize::stretch(30, 10)],
+            'operations' => [ImageResize::stretch(30, 10)],
         ]);
         $this->assertSame([30, 10], [$result->getWidth(), $result->getHeight()]);
     }

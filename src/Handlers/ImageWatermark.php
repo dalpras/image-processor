@@ -3,15 +3,14 @@
 declare(strict_types=1);
 
 // src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use ImagickException;
-use ImagickPixel;
 
-class OpWatermark {
-
+class ImageWatermark
+{
     /**
      * Overlay an external image on top of the current one.
      *
@@ -21,7 +20,7 @@ class OpWatermark {
      *                            top-left · top-right · bottom-left · bottom-right
      * @param float|null  $opacity 0‒1 to fade the watermark, or null = keep original
      */
-    public static function watermark(string $path, string $pos = 'center', ?float $opacity = null): Op
+    public static function watermark(string $path, string $pos = 'center', ?float $opacity = null): ImageHandle
     {
         $fn = static function (Imagick $img) use ($path, $pos, $opacity): void {
             /* ------------------------------------------------------------
@@ -86,8 +85,6 @@ class OpWatermark {
             unset($mark);
         };
 
-        return new Op("watermark:{$path}:{$pos}", $fn);
+        return new ImageHandle("watermark:{$path}:{$pos}", $fn);
     }
-
-
 }

@@ -2,23 +2,23 @@
 
 declare(strict_types=1);
 
-// src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use ImagickDraw;
 use ImagickException;
 use ImagickPixel;
 
-class OpClip {
+class ImageClip 
+{
 
     /**
      * ================================================================
      *  High-level helper — use 8BIM clipping path #1
      * ================================================================
      */
-    public static function clipPath(bool $inside = false): Op
+    public static function clipPath(bool $inside = false): ImageHandle
     {
         $fn = static function (Imagick $img) use ($inside): void {
             /* 1) Activate the PSD/8BIM clipping path (#1) */
@@ -48,7 +48,7 @@ class OpClip {
             self::paintTransparent($img, $drawFactory, true);
         };
 
-        return new Op("clip-path:{$inside}", $fn);
+        return new ImageHandle("clip-path:{$inside}", $fn);
     }
 
     /**
@@ -62,7 +62,7 @@ class OpClip {
         int  $w,
         int  $h,
         bool $invert = false
-    ): Op {
+    ): ImageHandle {
         $fn = static function (Imagick $img) use ($x, $y, $w, $h, $invert): void {
             // Factory keeps paintTransparent’s signature simple
             $drawFactory = static function (): ImagickDraw {
@@ -80,7 +80,7 @@ class OpClip {
             self::paintTransparent($img, fn() => $draw, $invert);
         };
 
-        return new Op("drill:{$w}x{$h}-{$x}-{$y}:{$invert}", $fn);
+        return new ImageHandle("drill:{$w}x{$h}-{$x}-{$y}:{$invert}", $fn);
     }
 
     /**

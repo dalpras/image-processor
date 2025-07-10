@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 // src/Ops/OpResize.php
-namespace DalPraS\Image\Ops;
+namespace DalPraS\Image\Handlers;
 
-use DalPraS\Image\Op;
+use DalPraS\Image\ImageHandle;
 use Imagick;
 use ImagickPixel;
 use RuntimeException;
 
-class OpFit {
-
+class ImageFit 
+{
     /**
      * Resize and position the image to fit or fill the target dimensions.
      *
@@ -25,7 +25,7 @@ class OpFit {
      * @param string $pos        Position anchor for alignment inside target canvas.
      * @param string $background Background color for padding space (default: 'white').
      */
-    public static function fitToTarget(int $tw, int $th, string $mode = 'fit', string $pos = 'center', string $background = 'white'): Op
+    public static function fitToTarget(int $tw, int $th, string $mode = 'fit', string $pos = 'center', string $background = 'white'): ImageHandle
     {
         $fn = function (Imagick $i) use ($tw, $th, $mode, $pos, $background) {
             ['width' => $ow, 'height' => $oh] = $i->getImageGeometry();
@@ -72,7 +72,7 @@ class OpFit {
                 $bg->clear();
             }
         };
-        return new Op("$mode:{$tw}x{$th}:{$pos}", $fn);
+        return new ImageHandle("$mode:{$tw}x{$th}:{$pos}", $fn);
     }
 
     private static function calcOffsets(int $tw, int $th, int $nw, int $nh, string $pos): array
@@ -91,7 +91,7 @@ class OpFit {
         };
     }
 
-    public static function margin(int $t, int $r, int $b, int $l, string $background = 'transparent'): Op
+    public static function margin(int $t, int $r, int $b, int $l, string $background = 'transparent'): ImageHandle
     {
         $fn = function (Imagick $i) use ($t, $r, $b, $l, $background) {
             // Nothing to do?
@@ -123,10 +123,10 @@ class OpFit {
             );
             $i->setImagePage(0, 0, 0, 0);                // normalise page offsets
         };
-        return new Op("margin:{$t}-{$r}-{$b}-{$l}:{$background}", $fn);
+        return new ImageHandle("margin:{$t}-{$r}-{$b}-{$l}:{$background}", $fn);
     }
 
-    public static function padding(int $t, int $r, int $b, int $l, string $background = 'transparent'): Op
+    public static function padding(int $t, int $r, int $b, int $l, string $background = 'transparent'): ImageHandle
     {
         $fn = function (Imagick $i) use ($t, $r, $b, $l, $background) {
             $i->resizeImage(
@@ -148,7 +148,6 @@ class OpFit {
                 -$t    // y-offset: move down by top-border height
             );
         };
-        return new Op("padding:{$t}-{$r}-{$b}-{$l}:{$background}", $fn);
+        return new ImageHandle("padding:{$t}-{$r}-{$b}-{$l}:{$background}", $fn);
     }
-
 }
