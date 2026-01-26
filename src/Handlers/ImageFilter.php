@@ -83,6 +83,7 @@ class ImageFilter
                         Imagick::INTERLACE_JPEG,
                         Imagick::INTERLACE_PLANE,
                         Imagick::INTERLACE_PNG,
+                        Imagick::INTERLACE_NO
                     ];
                     if (in_array($scheme, $allowed, true)) {
                         $img->setInterlaceScheme($scheme);
