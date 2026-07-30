@@ -48,7 +48,7 @@ class ImageClip
             self::paintTransparent($img, $drawFactory, true);
         };
 
-        return new ImageHandle("clip-path:{$inside}", $fn);
+        return new ImageHandle("clip-path-v5:{$inside}", $fn);
     }
 
     /**
@@ -95,23 +95,53 @@ class ImageClip
     ): void {
         ['width' => $w, 'height' => $h] = $img->getImageGeometry();
 
+        $img->setImageAlphaChannel(Imagick::ALPHACHANNEL_SET);
+        $img->setImageBackgroundColor(new ImagickPixel('transparent'));
+        $img->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+
         $mask = new Imagick();
-        $mask->newPseudoImage($w, $h, 'canvas:black');       // opaque black base
-        $mask->setImageBackgroundColor('white');             // used by PAINT_RESET
+        $mask->newImage($w, $h, new ImagickPixel('black'));
         $mask->setImageAlphaChannel(Imagick::ALPHACHANNEL_SET);
 
         /** @var ImagickDraw $draw */
-        $draw = $drawFactory();                              // user-supplied drawing
+        $draw = $drawFactory();
         $mask->drawImage($draw);
 
-        // Make (non-)white fully transparent, depending on $invert
         $mask->transparentPaintImage(new ImagickPixel('white'), 0.0, 0.0, $invert);
 
-        // Copy mask’s alpha channel back
-        $img->compositeImage($mask, Imagick::COMPOSITE_COPYOPACITY, 0, 0);
+        $img->compositeImage($mask, Imagick::COMPOSITE_COPYOPACITY, 0, 0, Imagick::CHANNEL_ALPHA);
+        $img->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+        $img->setImageBackgroundColor(new ImagickPixel('transparent'));
+        $img->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+
+        self::normaliseTransparentPixels($img, $w, $h);
 
         $mask->clear();
         unset($mask);
+    }
+
+    private static function normaliseTransparentPixels(Imagick $img, int $width, int $height): void
+    {
+        $normalized = new Imagick();
+        $normalized->newImage($width, $height, new ImagickPixel('transparent'));
+        $normalized->setImageFormat('png');
+        $normalized->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+        $normalized->setImageBackgroundColor(new ImagickPixel('transparent'));
+        $normalized->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+        $normalized->compositeImage($img, Imagick::COMPOSITE_OVER, 0, 0);
+
+        $blob = $normalized->getImageBlob();
+        if ($blob !== '') {
+            $img->clear();
+            $img->readImageBlob($blob);
+            $img->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+            $img->setImageBackgroundColor(new ImagickPixel('transparent'));
+            $img->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+            $img->setImagePage(0, 0, 0, 0);
+        }
+
+        $normalized->clear();
+        unset($normalized);
     }
     
 }
