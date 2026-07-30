@@ -11,6 +11,9 @@ use Throwable;
 
 final class ImageProcessor
 {
+    /** @var array<string,ImageInfo> */
+    private array $resolved = [];
+
     private const DEFAULT_COMPRESSION_QUALITY = 75;
     private const DEFAULT_IMAGE_FORMAT = 'webp';
 
@@ -72,9 +75,16 @@ final class ImageProcessor
         $cachePath = $outputDir . DIRECTORY_SEPARATOR . $basename;
 
         // ---------- 2. fast-exit if perfect match exists ----------
+        // The Colors XML references the same drawings for many products. Keep
+        // resolved cache metadata in memory so repeated calls avoid filesystem
+        // stat/getimagesize work during the same request or worker lifecycle.
+        if (!$force && isset($this->resolved[$cachePath])) {
+            return $this->resolved[$cachePath];
+        }
+
         if (!$force && is_file($cachePath)) {
             [$w, $h] = @getimagesize($cachePath) ?: [0, 0];
-            return new ImageInfo($cachePath, $w, $h);
+            return $this->resolved[$cachePath] = new ImageInfo($cachePath, $w, $h);
         }
 
         // ---------- 3. create / overwrite ----------
@@ -111,7 +121,7 @@ final class ImageProcessor
         $im->clear();
         unset($im);
 
-        return new ImageInfo($cachePath, $w, $h);
+        return $this->resolved[$cachePath] = new ImageInfo($cachePath, $w, $h);
     }
 
     private static function normaliseOpsForHash(array $ops): string

@@ -236,34 +236,21 @@ class ImageFit
                 $image->setImageBackgroundColor(new ImagickPixel('transparent'));
             }
 
-            $canvas = new Imagick();
-            $canvas->newImage($canvasWidth, $canvasHeight, new ImagickPixel($background));
-            if ($transparentBackground) {
-                $canvas->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
-                $canvas->setImageBackgroundColor(new ImagickPixel('transparent'));
-                $canvas->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
-            }
-            $canvas->setImageFormat($image->getImageFormat());
-            $canvas->compositeImage(
-                $image,
-                Imagick::COMPOSITE_OVER,
-                $offsetX + $marginOffsetX + $paddingOffsetX,
-                $offsetY + $marginOffsetY + $paddingOffsetY
-            );
+            $x = $offsetX + $marginOffsetX + $paddingOffsetX;
+            $y = $offsetY + $marginOffsetY + $paddingOffsetY;
 
-            $blob = $canvas->getImageBlob();
-            if ($blob === '') {
-                throw new RuntimeException('Failed to compose thumbnail canvas.');
-            }
-            $image->clear();
-            $image->readImageBlob($blob);
+            // extentImage() performs the same canvas composition in-place. This
+            // avoids allocating a second full-size image and, more importantly,
+            // avoids the expensive encode -> blob -> decode round-trip.
+            $image->setImageBackgroundColor(new ImagickPixel($background));
+            $image->extentImage($canvasWidth, $canvasHeight, -$x, -$y);
+            $image->setImagePage(0, 0, 0, 0);
+
             if ($transparentBackground) {
                 $image->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
                 $image->setImageBackgroundColor(new ImagickPixel('transparent'));
                 $image->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
             }
-            $image->setImagePage(0, 0, 0, 0);
-            $canvas->clear();
         };
 
         return new ImageHandle(sprintf(
