@@ -9,46 +9,59 @@ use Imagick;
 use ImagickDraw;
 use ImagickException;
 use ImagickPixel;
+use RuntimeException;
 
 class ImageClip 
 {
 
     /**
-     * ================================================================
-     *  High-level helper — use 8BIM clipping path #1
-     * ================================================================
+     * Apply the first Photoshop/8BIM clipping path as image transparency.
+     *
+     * clipPathImage() only installs a clipping mask for subsequent Imagick
+     * operations. Copy the rasterized mask explicitly into the alpha channel.
      */
     public static function clipPath(bool $inside = false): ImageHandle
     {
-        $fn = static function (Imagick $img) use ($inside): void {
-            /* 1) Activate the PSD/8BIM clipping path (#1) */
+        $fn = static function (Imagick $image) use ($inside): void {
+            $image->setImageAlphaChannel(Imagick::ALPHACHANNEL_SET);
+            $image->setImageBackgroundColor(new ImagickPixel('transparent'));
+
             try {
-                if (!$img->clipPathImage('#1', $inside)) {    // keeps later ops inside or outside the path
+                if (!$image->clipPathImage('#1', $inside)) {
                     throw new ImagickException('clipPathImage failed');
                 }
-            } catch (ImagickException $e) {
-                trigger_error($e->getMessage(), E_USER_NOTICE);
+
+                $mask = $image->getImageClipMask();
+                if (!$mask instanceof Imagick) {
+                    throw new RuntimeException('ImageMagick did not expose the clipping-path mask.');
+                }
+
+                $mask->setImageColorspace(Imagick::COLORSPACE_GRAY);
+                $mask->setImageAlphaChannel(Imagick::ALPHACHANNEL_OFF);
+                $mask->setImagePage(0, 0, 0, 0);
+
+                $image->compositeImage(
+                    $mask,
+                    Imagick::COMPOSITE_COPYOPACITY,
+                    0,
+                    0,
+                    Imagick::CHANNEL_ALPHA
+                );
+
+                $image->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+                $image->setImageBackgroundColor(new ImagickPixel('transparent'));
+                $image->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+                $image->setImagePage(0, 0, 0, 0);
+
+                $mask->clear();
+                unset($mask);
+            } catch (ImagickException | RuntimeException $exception) {
+                trigger_error($exception->getMessage(), E_USER_NOTICE);
             }
-
-            /* 2) Build a draw-object that “paints nothing” except inside the clip area
-              We use PAINT_RESET so that the region reset to the *background*
-              colour (white), leaving everything else black. */
-            $drawFactory = static function (): ImagickDraw {
-                $d = new ImagickDraw();
-                $d->setFillColor(new ImagickPixel('black'));                   // irrelevant for PAINT_RESET but required
-                $d->color(0, 0, Imagick::PAINT_RESET);
-                return $d;
-            };
-
-            /* 3) Copy the mask’s alpha back.
-              invert = true  →  transparentPaintImage() makes anything *not* white transparent,
-                                which means:
-                                • $inside = false  → keep INSIDE the path, drop outside
-                                • $inside = true   → drop inside the path, keep outside          */
-            self::paintTransparent($img, $drawFactory, true);
         };
 
-        return new ImageHandle("clip-path:{$inside}", $fn);
+        // Versioned key invalidates files cached without a real alpha channel.
+        return new ImageHandle("clip-path-v3:{$inside}", $fn);
     }
 
     /**

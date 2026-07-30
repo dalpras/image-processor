@@ -96,6 +96,14 @@ final class ImageProcessor
             $im->setImageFormat($outputExt);
         }
 
+        // Preserve transparency when converting/compressing formats that support
+        // alpha. Without explicit activation, some ImageMagick/WebP builds flatten
+        // transparent canvas pixels onto their underlying black RGB values.
+        if (in_array($outputExt, ['png', 'webp', 'gif'], true) && $im->getImageAlphaChannel()) {
+            $im->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+            $im->setImageBackgroundColor(new ImagickPixel('transparent'));
+        }
+
         $im->stripImage();
         $im->writeImage($cachePath);
         $w = $im->getImageWidth();

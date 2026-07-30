@@ -91,6 +91,226 @@ class ImageFit
         };
     }
 
+
+    /**
+     * Reproduce the canvas composition historically provided by Thumbnail.
+     *
+     * The source is resized proportionally, then composited on a canvas whose
+     * dimensions are determined from the requested size and margins. Both
+     * enlargement and shrinking are supported; Lanczos is used for enlargement
+     * while thumbnailImage() is retained for efficient downscaling.
+     *
+     * @param array{width?:int,height?:int,ratio?:float} $size
+     * @param array<int,int> $margin CSS-like [all] or [top,right,bottom,left]
+     * @param array<int,int> $padding CSS-like [all] or [top,right,bottom,left]
+     */
+    public static function thumbnailCanvas(
+        array $size,
+        string $fit = 'inside',
+        string $align = 'C',
+        array $margin = [],
+        array $padding = [],
+        string $background = 'white'
+    ): ImageHandle {
+        $width = (int) ($size['width'] ?? 0);
+        $height = (int) ($size['height'] ?? 0);
+        $ratio = isset($size['ratio']) ? (float) $size['ratio'] : null;
+
+        if ($width <= 0 && $height > 0 && $ratio !== null && $ratio > 0) {
+            $width = (int) ($height * $ratio);
+        } elseif ($height <= 0 && $width > 0 && $ratio !== null && $ratio > 0) {
+            $height = (int) ($width / $ratio);
+        }
+
+        $margin = self::normaliseSpacing($margin);
+        $padding = self::normaliseSpacing($padding);
+
+        $fn = static function (Imagick $image) use ($width, $height, $fit, $align, $margin, $padding, $background): void {
+            $sourceWidth = $image->getImageWidth();
+            $sourceHeight = $image->getImageHeight();
+            if ($sourceWidth <= 0 || $sourceHeight <= 0) {
+                throw new RuntimeException('Source image has invalid dimensions.');
+            }
+
+            $sourceRatio = $sourceWidth / $sourceHeight;
+            $canvasWidth = $width;
+            $canvasHeight = $height;
+
+            if ($canvasWidth <= 0 && $canvasHeight <= 0) {
+                $canvasWidth = $sourceWidth;
+                $canvasHeight = $sourceHeight;
+            } elseif ($canvasWidth <= 0) {
+                $canvasWidth = (int) ($canvasHeight * $sourceRatio);
+            } elseif ($canvasHeight <= 0) {
+                $canvasHeight = (int) ($canvasWidth / $sourceRatio);
+            }
+
+            $resizeWidth = $canvasWidth;
+            $resizeHeight = $canvasHeight;
+            $bestFit = false;
+
+            switch ($fit) {
+                case 'width':
+                    $resizeHeight = (int) ($canvasWidth / $sourceRatio);
+                    break;
+
+                case 'height':
+                    $resizeWidth = (int) ($canvasHeight * $sourceRatio);
+                    break;
+
+                case 'inside':
+                case 'max':
+                    $bestFit = true;
+                    break;
+
+                case 'crop':
+                    $canvasRatio = $canvasWidth / $canvasHeight;
+                    if ($canvasRatio > $sourceRatio) {
+                        $resizeWidth = $canvasWidth;
+                        $resizeHeight = (int) ($canvasWidth / $sourceRatio);
+                    } else {
+                        $resizeWidth = (int) ($canvasHeight * $sourceRatio);
+                        $resizeHeight = $canvasHeight;
+                    }
+                    break;
+
+                default:
+                    throw new RuntimeException(sprintf('Unsupported thumbnail fit rule "%s".', $fit));
+            }
+
+            [$paddingTop, $paddingRight, $paddingBottom, $paddingLeft] = $padding;
+            $resizeWidth -= $paddingLeft + $paddingRight;
+            $resizeHeight -= $paddingTop + $paddingBottom;
+            if ($resizeWidth <= 0 || $resizeHeight <= 0) {
+                throw new RuntimeException('Padding produces invalid resize dimensions.');
+            }
+
+            if ($bestFit) {
+                $scale = min($resizeWidth / $sourceWidth, $resizeHeight / $sourceHeight);
+                $targetWidth = max(1, (int) round($sourceWidth * $scale));
+                $targetHeight = max(1, (int) round($sourceHeight * $scale));
+            } else {
+                $targetWidth = max(1, $resizeWidth);
+                $targetHeight = max(1, $resizeHeight);
+            }
+
+            $scale = min($targetWidth / $sourceWidth, $targetHeight / $sourceHeight);
+            if ($scale < 1.0) {
+                $image->thumbnailImage($targetWidth, $targetHeight, $bestFit);
+            } elseif ($scale > 1.0) {
+                if ($bestFit) {
+                    $image->resizeImage($targetWidth, $targetHeight, Imagick::FILTER_LANCZOS, 1);
+                } else {
+                    // Legacy Thumbnail preserves the aspect ratio for width/height/crop.
+                    $actualWidth = (int) round($sourceWidth * $scale);
+                    $actualHeight = (int) round($sourceHeight * $scale);
+                    $image->resizeImage($actualWidth, $actualHeight, Imagick::FILTER_LANCZOS, 1);
+                }
+            }
+
+            [$marginTop, $marginRight, $marginBottom, $marginLeft] = $margin;
+            $canvasWidth += $marginLeft + $marginRight;
+            $canvasHeight += $marginTop + $marginBottom;
+            if ($canvasWidth <= 0 || $canvasHeight <= 0) {
+                throw new RuntimeException('Margins produce invalid canvas dimensions.');
+            }
+
+            [$offsetX, $offsetY] = self::legacyOffsets(
+                $image->getImageWidth(),
+                $image->getImageHeight(),
+                $canvasWidth,
+                $canvasHeight,
+                $align
+            );
+
+            $marginOffsetX = (int) (($marginLeft - $marginRight) / 2);
+            $marginOffsetY = (int) (($marginTop - $marginBottom) / 2);
+            $paddingOffsetX = (int) (($paddingLeft - $paddingRight) / 2);
+            $paddingOffsetY = (int) (($paddingTop - $paddingBottom) / 2);
+
+            $transparentBackground = strcasecmp($background, 'transparent') === 0;
+            if ($transparentBackground) {
+                // Some ImageMagick builds retain RGB black below transparent pixels
+                // unless alpha is explicitly activated before composition.
+                $image->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+                $image->setImageBackgroundColor(new ImagickPixel('transparent'));
+            }
+
+            $canvas = new Imagick();
+            $canvas->newImage($canvasWidth, $canvasHeight, new ImagickPixel($background));
+            if ($transparentBackground) {
+                $canvas->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+                $canvas->setImageBackgroundColor(new ImagickPixel('transparent'));
+                $canvas->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+            }
+            $canvas->setImageFormat($image->getImageFormat());
+            $canvas->compositeImage(
+                $image,
+                Imagick::COMPOSITE_OVER,
+                $offsetX + $marginOffsetX + $paddingOffsetX,
+                $offsetY + $marginOffsetY + $paddingOffsetY
+            );
+
+            $blob = $canvas->getImageBlob();
+            if ($blob === '') {
+                throw new RuntimeException('Failed to compose thumbnail canvas.');
+            }
+            $image->clear();
+            $image->readImageBlob($blob);
+            if ($transparentBackground) {
+                $image->setImageAlphaChannel(Imagick::ALPHACHANNEL_ACTIVATE);
+                $image->setImageBackgroundColor(new ImagickPixel('transparent'));
+                $image->setImageType(Imagick::IMGTYPE_TRUECOLORMATTE);
+            }
+            $image->setImagePage(0, 0, 0, 0);
+            $canvas->clear();
+        };
+
+        return new ImageHandle(sprintf(
+            'thumbnail-canvas-v2:%dx%d:%s:%s:m%s:p%s:bg%s',
+            $width,
+            $height,
+            $fit,
+            $align,
+            implode(',', $margin),
+            implode(',', $padding),
+            $background
+        ), $fn);
+    }
+
+    /** @return array{0:int,1:int,2:int,3:int} */
+    private static function normaliseSpacing(array $spacing): array
+    {
+        return match (count($spacing)) {
+            0 => [0, 0, 0, 0],
+            1 => [(int) $spacing[0], (int) $spacing[0], (int) $spacing[0], (int) $spacing[0]],
+            4 => [(int) $spacing[0], (int) $spacing[1], (int) $spacing[2], (int) $spacing[3]],
+            default => throw new RuntimeException('Spacing must contain one or four values.'),
+        };
+    }
+
+    /** @return array{0:int,1:int} */
+    private static function legacyOffsets(
+        int $sourceWidth,
+        int $sourceHeight,
+        int $canvasWidth,
+        int $canvasHeight,
+        string $align
+    ): array {
+        $x = match ($align) {
+            'NE', 'E', 'SE' => $canvasWidth - $sourceWidth,
+            'NW', 'W', 'SW' => 0,
+            default => (int) round(($canvasWidth - $sourceWidth) / 2),
+        };
+        $y = match ($align) {
+            'N', 'NE', 'NW' => 0,
+            'SE', 'S', 'SW' => $canvasHeight - $sourceHeight,
+            default => (int) round(($canvasHeight - $sourceHeight) / 2),
+        };
+
+        return [$x, $y];
+    }
+
     public static function margin(int $t, int $r, int $b, int $l, string $background = 'transparent'): ImageHandle
     {
         $fn = function (Imagick $i) use ($t, $r, $b, $l, $background) {

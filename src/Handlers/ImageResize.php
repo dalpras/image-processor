@@ -26,7 +26,7 @@ class ImageResize
      * @param int  $dim      Target size in pixels (must be > 0).
      * @param bool $isWidth  true ⇒ match width, false ⇒ match height.
      *
-     * @return Op  Callable wrapper for ImageProcessor::process()
+     * @return ImageHandle  Callable wrapper for \DalPraS\Image\ImageProcessor::process()
      */
     public static function resizeByRatio(int $dim, bool $isWidth = true): ImageHandle
     {
