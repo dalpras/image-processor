@@ -126,6 +126,7 @@ All operations return an `ImageHandle` for use in the `operations` pipeline.
 ### ImageProcessor
 
 - `__construct(?string $tempDir = null)`
+- `setPathMapper(callable $mapper): void` — optional path/URL mapping callback
 - `process(string $imagePath, array $options = []): ImageInfo`
 
 #### Options
@@ -138,6 +139,39 @@ All operations return an `ImageHandle` for use in the `operations` pipeline.
 | operations | array   | []          | List of `ImageHandle` operations                      |
 | fallback   | string  | null        | Fallback image path if source is missing              |
 
+### Optional path mapping
+
+The library does not depend on VIMAR's `PathMap` or any framework. Register a
+callback at service construction; otherwise original paths are used unchanged:
+
+```php
+$processor->setPathMapper(function (string $value, string $context): string {
+    // 'source', 'outputDir' and 'fallback' must resolve to filesystem paths.
+    // 'publicUrl' maps the generated absolute path to a public URL.
+    return match ($context) {
+        ImageProcessor::PATH_SOURCE,
+        ImageProcessor::PATH_OUTPUT_DIR,
+        ImageProcessor::PATH_FALLBACK => resolveLocalPath($value),
+        ImageProcessor::PATH_PUBLIC_URL => publicUrlFor($value) ?? '',
+    };
+});
+
+$info = $processor->process('../images/photo.jpg', [
+    'outputDir' => '../cache/thumbs',
+    'fallback' => '../images/placeholder.png',
+]);
+echo $info->getPathname();   // absolute filesystem path
+// The mapper may return a site-relative path, such as /cache/thumbs/....webp
+echo $info->getPublicUrl(); // string|null
+```
+
+`ImageProcessor` calls the mapper once for the source, once for the output
+directory, for the fallback only if the source is missing, and for the public
+URL of each newly created `ImageInfo`. Empty/invalid mappings of filesystem
+paths throw an exception rather than allowing Imagick to write to an
+unexpected path. Mapping is not automatically applied to paths captured by
+individual image operation handlers (such as watermark paths).
+
 ---
 
 ### ImageInfo
@@ -148,6 +182,7 @@ Extends `SplFileInfo`, with:
 - `getWidth(): int`
 - `getHeight(): int`
 - `getRatio(): float`
+- `getPublicUrl(): ?string` — site URL when a mapper exposes one; otherwise `null`
 - `getInlinePng(): string` — Data URI for HTML `<img src>`
 - `getSpaceHolder(): string` — SVG placeholder (for lazy loading, etc.)
 
