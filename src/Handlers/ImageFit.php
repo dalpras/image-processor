@@ -12,6 +12,22 @@ use RuntimeException;
 
 class ImageFit 
 {
+
+    public const SCALE_MODE_FIT        = 'fit';
+    public const SCALE_MODE_FIT_WIDTH  = 'fitWidth';
+    public const SCALE_MODE_FIT_HEIGHT = 'fitHeight';
+    public const SCALE_MODE_FILL       = 'fill';
+
+    public const POSITION_TOP_LEFT      = 'top-left';
+    public const POSITION_TOP_CENTER    = 'top-center';
+    public const POSITION_TOP_RIGHT     = 'top-right';
+    public const POSITION_CENTER_LEFT   = 'center-left';
+    public const POSITION_CENTER        = 'center';
+    public const POSITION_CENTER_RIGHT  = 'center-right';
+    public const POSITION_BOTTOM_LEFT   = 'bottom-left';
+    public const POSITION_BOTTOM_CENTER = 'bottom-center';
+    public const POSITION_BOTTOM_RIGHT  = 'bottom-right';
+
     /**
      * Resize and position the image to fit or fill the target dimensions.
      *
@@ -25,7 +41,7 @@ class ImageFit
      * @param string $pos        Position anchor for alignment inside target canvas.
      * @param string $background Background color for padding space (default: 'white').
      */
-    public static function fitToTarget(int $tw, int $th, string $mode = 'fit', string $pos = 'center', string $background = 'white'): ImageHandle
+    public static function fitToTarget(int $tw, int $th, string $mode = self::SCALE_MODE_FIT, string $pos = 'center', string $background = 'white'): ImageHandle
     {
         $fn = function (Imagick $i) use ($tw, $th, $mode, $pos, $background) {
             ['width' => $ow, 'height' => $oh] = $i->getImageGeometry();
@@ -45,10 +61,10 @@ class ImageFit
             $sw = $tw / $ow;
             $sh = $th / $oh;
             $scale = match ($mode) {
-                'fit'       => min($sw, $sh),
-                'fitWidth'  => $sw,
-                'fitHeight' => $sh,
-                'fill'      => max($sw, $sh),
+                self::SCALE_MODE_FIT        => min($sw, $sh),
+                self::SCALE_MODE_FIT_WIDTH  => $sw,
+                self::SCALE_MODE_FIT_HEIGHT => $sh,
+                self::SCALE_MODE_FILL       => max($sw, $sh),
                 default     => throw new RuntimeException('Bad mode')
             };
             $nw = (int)($ow * $scale);
@@ -78,15 +94,15 @@ class ImageFit
     private static function calcOffsets(int $tw, int $th, int $nw, int $nh, string $pos): array
     {
         return match ($pos) {
-            'top-left'      => [0, 0],
-            'top-center'    => [(int)(($tw - $nw) / 2), 0],
-            'top-right'     => [$tw - $nw, 0],
-            'center-left'   => [0, (int)(($th - $nh) / 2)],
-            'center'        => [(int)(($tw - $nw) / 2), (int)(($th - $nh) / 2)],
-            'center-right'  => [$tw - $nw, (int)(($th - $nh) / 2)],
-            'bottom-left'   => [0, $th - $nh],
-            'bottom-center' => [(int)(($tw - $nw) / 2), $th - $nh],
-            'bottom-right'  => [$tw - $nw, $th - $nh],
+            SELF::POSITION_TOP_LEFT      => [0, 0],
+            SELF::POSITION_TOP_CENTER    => [(int)(($tw - $nw) / 2), 0],
+            SELF::POSITION_TOP_RIGHT     => [$tw - $nw, 0],
+            SELF::POSITION_CENTER_LEFT   => [0, (int)(($th - $nh) / 2)],
+            SELF::POSITION_CENTER        => [(int)(($tw - $nw) / 2), (int)(($th - $nh) / 2)],
+            SELF::POSITION_CENTER_RIGHT  => [$tw - $nw, (int)(($th - $nh) / 2)],
+            SELF::POSITION_BOTTOM_LEFT   => [0, $th - $nh],
+            SELF::POSITION_BOTTOM_CENTER => [(int)(($tw - $nw) / 2), $th - $nh],
+            SELF::POSITION_BOTTOM_RIGHT  => [$tw - $nw, $th - $nh],
             default => throw new RuntimeException('Bad position')
         };
     }
